@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include urway_erpnext *.css
+recursive-include urway_erpnext *.csv
+recursive-include urway_erpnext *.html
+recursive-include urway_erpnext *.ico
+recursive-include urway_erpnext *.js
+recursive-include urway_erpnext *.json
+recursive-include urway_erpnext *.md
+recursive-include urway_erpnext *.png
+recursive-include urway_erpnext *.py
+recursive-include urway_erpnext *.svg
+recursive-include urway_erpnext *.txt
+recursive-exclude urway_erpnext *.pyc

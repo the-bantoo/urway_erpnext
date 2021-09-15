@@ -9,6 +9,16 @@ app_color = "grey"
 app_email = "devs@thebantoo.com"
 app_license = "MIT"
 
+
+# Document Events
+# ---------------
+# Hook on document methods and events
+doc_events = {
+    "URWay Payment Transaction": {
+        #"before_save": "urway_erpnext.api.exe",
+    }
+}
+
 # Includes in <head>
 # ------------------
 

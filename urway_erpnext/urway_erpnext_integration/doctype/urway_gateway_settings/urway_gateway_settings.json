@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "creation": "2021-09-12 00:47:03.589830",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "credentials_section",
+  "terminal_id",
+  "password",
+  "column_break_3",
+  "merchantsecret_key",
+  "mode_section",
+  "testing",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Credentials"
+  },
+  {
+   "fieldname": "terminal_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Terminal ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Password",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "merchantsecret_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Merchant/Secret Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mode_section",
+   "fieldtype": "Section Break",
+   "label": "Mode"
+  },
+  {
+   "default": "0",
+   "description": "Activates testing mode. Make sure to uncheck for production mode.",
+   "fieldname": "testing",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Testing"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Status",
+   "options": "Testing\nProduction"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2021-09-15 18:35:32.697495",
+ "modified_by": "Administrator",
+ "module": "URWay ERPNext Integration",
+ "name": "URWay Gateway Settings",
+ "name_case": "Title Case",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

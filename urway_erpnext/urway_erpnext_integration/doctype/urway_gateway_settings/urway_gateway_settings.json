@@ -12,7 +12,9 @@
   "merchantsecret_key",
   "mode_section",
   "testing",
-  "status"
+  "status",
+  "setup_section",
+  "mode_of_payment"
  ],
  "fields": [
   {
@@ -64,12 +66,24 @@
    "hidden": 1,
    "label": "Status",
    "options": "Testing\nProduction"
+  },
+  {
+   "fieldname": "setup_section",
+   "fieldtype": "Section Break",
+   "label": "Setup"
+  },
+  {
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2021-09-15 18:35:32.697495",
+ "modified": "2021-09-17 14:49:08.689339",
  "modified_by": "Administrator",
  "module": "URWay ERPNext Integration",
  "name": "URWay Gateway Settings",

@@ -1,9 +1,12 @@
 import base64, json
 import datetime
 import hashlib
+
+from pip._vendor.urllib3 import response
 import frappe
 import hashlib
 from frappe.integrations.utils import get_request_session, parse_qs 
+from frappe.utils import today
 
 def make_request(method, url, auth=None, headers=None, data=None):
 	auth = auth or ''
@@ -24,91 +27,132 @@ def make_request(method, url, auth=None, headers=None, data=None):
 		raise exc
 
 def encrypt_string(hash_string):
-	sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
-	return sha_signature
+	return hashlib.sha256(hash_string.encode()).hexdigest()
 
 @frappe.whitelist()
 def exe(name):
-	doc = frappe.get_doc( 'URWay Payment Transaction', name )
 	
-	settings = frappe.get_doc('URWay Gateway Settings')
-
-	testing = settings.testing
-	terminal = settings.terminal_id
-	key = settings.merchantsecret_key
-	password = settings.password
-
-
-	"""add to doctype"""
-	server_ip = "172.105.90.8"
-	customer_ip = "10.10.10.10"
-	country = "Saudi Arabia"
-	currency = "SAR"
-	customer_email = "customer@mail.com"
-	customer_address = "customer_address"
-	amount = str(doc.amount)
-	action = str(1)	
-
-	data = {}
-
-	test_data = {}
-
-	"""
-	test_data["amount"] = "10.00"
-	test_data["address"] = "address"
-	test_data["customerIp"] = "10.10.10.10"
-	test_data["city"] = "Arabia"
-	test_data["trackid"] = "123123"
-	test_data["terminalId"] = "tis"
-	test_data["action"] = "1"
-	test_data["password"] = "tis@123"
-	test_data["merchantIp"] = server_ip
-	test_data["requestHash"] = "edecfb35e7bd2559c88ecc761553e79b1f868c1c9a0d0ea6ac3051f5bd058c2d"
-	test_data["country"] = "SA"
-	test_data["currency"] = "SAR"
-	test_data["customerEmail"] = "a@a.com"
-	test_data["zipCode"] = ""
-
-	for i in test_data:
-		frappe.errprint( i + ": " + str(test_data[i]) )
-	"""
-
-	hash = encrypt_string( "|".join([doc.name, terminal, password, key, amount, currency]) )
-
-	res = ""
-	e = ""
-	feedback = ""
 	url = ""
+	invoice = frappe.get_doc( 'Sales Invoice', name )
+	if int(invoice.outstanding_amount) != 0:
+	
+		transaction = frappe.new_doc( 'URWay Payment Transaction' )
+		settings = frappe.get_doc('URWay Gateway Settings' )
 
-	try:
-		res = make_request("POST", "https://payments-dev.urway-tech.com/URWAYPGService/transaction/jsonProcess/JSONrequest", data = {
-			"amount": amount,
-			"address": customer_address,
-			"city": "Arabia",
-			"customerIp": customer_ip,
-			"customerEmail": customer_email,
-			"zipCode": "",
-			"trackid": doc.name,
-			"terminalId": terminal,
-			"action": action,
-			"password": password,
-			"merchantIp": server_ip,
-			"requestHash": hash,
-			"country": country,
-			"currency": currency
-		})
-	except Exception as e:
-		frappe.errprint("Oops !!! \n \n" + str(e))
-		doc.error_message = str(e)
-		doc.status = "Failed"
+		testing = settings.testing
+		terminal = settings.terminal_id
+		payment_mode = settings.mode_of_payment
+		key = settings.merchantsecret_key
+		password = settings.password
+		customer_address = invoice.contact_display
+		amount = str(invoice.outstanding_amount)
+		action = str(1)
+
+		"""add to doctype"""
+		server_ip = "172.105.90.8"
+		customer_ip = "10.10.10.10"
+		country = "Saudi Arabia"
+		currency = "SAR"
+		customer_email = "customer@mail.com"
+
+		hash = encrypt_string( "|".join([invoice.name, terminal, password, key, amount, currency]) )
 		
-	finally:
-		doc.message = str(res)
-		frappe.errprint("------- done --------" )
-		#doc.save()
-		if e == "" or not e:
-			doc.error_message = ""
-			doc.status = "Pending"
-			url = ( res['targetUrl'] + "?paymentid=" + res['payid'] )
+		request_url = ""
+		response = ""
+		exc = ""
+		
+		if str(testing) == "1":
+			request_url = "https://payments-dev.urway-tech.com/URWAYPGService/transaction/jsonProcess/JSONrequest"
+		else:
+			request_url = ""
 
-	return url
+		try:
+			response = make_request("POST", request_url, data = {
+				"amount": amount,
+				"address": customer_address,
+				"city": "Arabia",
+				"customerIp": customer_ip,
+				"customerEmail": customer_email,
+				"zipCode": "",
+				"trackid": invoice.name,
+				"terminalId": terminal,
+				"action": action,
+				"password": password,
+				"merchantIp": server_ip,
+				"requestHash": hash,
+				"country": country,
+				"currency": currency
+			})
+		except Exception as exc:
+			frappe.msgprint(str(exc), "Oops !!!")
+			transaction.error_message = str(exc)
+			transaction.status = "Failed"
+			
+		finally:
+			transaction.message = str(response)
+			transaction.customer = invoice.customer
+			transaction.amount = amount
+			transaction.sales_invoice = invoice.name
+			
+			if exc == "" or not exc:
+				transaction.error_message = ""
+				transaction.status = "Pending"
+				if response['responseCode']:
+					frappe.errprint("-------- error --------")
+					if response['responseCode'] == "612":
+						frappe.errprint("Invalid amount \n \n" + str(response) )
+					else:
+						frappe.errprint( str(response) )
+
+					error_message(response['reason'], response['responseCode'])
+
+				else:
+					url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
+					transaction.payment_entry = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name
+					transaction.insert()
+					transaction.submit()
+			
+			invoice.terms = str(invoice.terms or "") + "<a href='" + url + "'><underline>Click to Pay with URWay</underline><a/>"
+			invoice.flags.ignore_validate_update_after_submit = True
+			invoice.flags.ignore_validate = True
+			invoice.save()
+	else:
+		frappe.msgprint("This invoice is already fully paid")
+
+	return url or ""
+
+def error_message(reason, response):
+	frappe.msgprint(reason, "Error " + response)
+
+def make_payment_entry(customer, invoice_name, amount, payment_mode):
+
+	payment_entry = frappe.get_doc({
+		"doctype": "Payment Entry",
+		"paid_amount": amount,
+		"received_amount": amount,
+		"base_received_amount": amount,
+		"paid_to_account_currency": "SAR",
+		"paid_to": "Cash - BAI",
+		"company": "Bantoo Accounting Innovations",
+		"party_type": "Customer",
+		"party": customer,
+		"mode_of_payment": payment_mode,
+		"payment_type": "Receive",
+		"target_exchange_rate": 1,
+		"source_exchange_rate": 1,
+		"posting_date": today(),
+		"references": [
+			{ 
+				"reference_doctype": "Sales Invoice",
+				"reference_name": invoice_name,
+				"allocated_amount": amount,
+				"total_amount": amount,
+				"outstanding_amount": 0
+			}
+		]
+	})
+
+	payment_name = payment_entry.insert()
+	payment_entry.submit()
+
+	return payment_name

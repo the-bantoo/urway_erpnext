@@ -8,6 +8,13 @@ import hashlib
 from frappe.integrations.utils import get_request_session, parse_qs 
 from frappe.utils import today
 
+"""
+Todo
+- Validate payment
+- Add production url
+- 
+"""
+
 def make_request(method, url, auth=None, headers=None, data=None):
 	auth = auth or ''
 	data = data or {}
@@ -49,7 +56,7 @@ def exe(name):
 		action = str(1)
 
 		"""add to doctype"""
-		server_ip = "172.105.90.8"
+		server_ip = "194.195.217.200"
 		customer_ip = "10.10.10.10"
 		country = "Saudi Arabia"
 		currency = "SAR"
@@ -108,14 +115,17 @@ def exe(name):
 
 				else:
 					url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
-					transaction.payment_entry = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name
+					payment_name = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name
+					invoice.terms = str(invoice.terms or "") + "<a href='" + url + "'><underline>Click to Pay with URWay</underline><a/>"
+					invoice.flags.ignore_validate_update_after_submit = True
+					invoice.flags.ignore_validate = True
+					invoice.save()					
+
+					payment_entry = frappe.get_doc("Payment Entry", payment_name)
+					payment_entry.submit()
+
 					transaction.insert()
 					transaction.submit()
-			
-			invoice.terms = str(invoice.terms or "") + "<a href='" + url + "'><underline>Click to Pay with URWay</underline><a/>"
-			invoice.flags.ignore_validate_update_after_submit = True
-			invoice.flags.ignore_validate = True
-			invoice.save()
 	else:
 		frappe.msgprint("This invoice is already fully paid")
 
@@ -125,15 +135,16 @@ def error_message(reason, response):
 	frappe.msgprint(reason, "Error " + response)
 
 def make_payment_entry(customer, invoice_name, amount, payment_mode):
-
+	company = frappe.get_doc("Company", frappe.defaults.get_user_default("Company"))
+	
 	payment_entry = frappe.get_doc({
 		"doctype": "Payment Entry",
 		"paid_amount": amount,
 		"received_amount": amount,
 		"base_received_amount": amount,
-		"paid_to_account_currency": "SAR",
-		"paid_to": "Cash - BAI",
-		"company": "Bantoo Accounting Innovations",
+		"paid_to_account_currency": company.default_currency,
+		"paid_to": company.default_cash_account,
+		"company": company.name,
 		"party_type": "Customer",
 		"party": customer,
 		"mode_of_payment": payment_mode,
@@ -153,6 +164,5 @@ def make_payment_entry(customer, invoice_name, amount, payment_mode):
 	})
 
 	payment_name = payment_entry.insert()
-	payment_entry.submit()
 
 	return payment_name

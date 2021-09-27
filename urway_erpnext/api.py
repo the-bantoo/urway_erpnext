@@ -116,7 +116,8 @@ def exe(name):
 				else:
 					url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
 					payment_name = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name
-					invoice.terms = str(invoice.terms or "") + "<a href='" + url + "'><underline>Click to Pay with URWay</underline><a/>"
+					if "URWAYPGService" not in str(invoice.terms):
+						invoice.terms = str(invoice.terms or "") + "<a href='" + url + "' style='text-decoration: underline;'>Click to Pay with URWay<a/>"
 					invoice.flags.ignore_validate_update_after_submit = True
 					invoice.flags.ignore_validate = True
 					invoice.save()					

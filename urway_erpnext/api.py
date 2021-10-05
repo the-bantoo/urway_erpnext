@@ -7,10 +7,33 @@ import frappe
 import hashlib
 from frappe.integrations.utils import get_request_session, parse_qs 
 from frappe.utils import today
+from frappe.utils.background_jobs import enqueue
+from frappe.core.page.background_jobs.background_jobs import get_info
+
+def get_job_queue(job_name):
+	queue_info = get_info()
+	queue_by_job_name = [queue for queue in queue_info if queue.get("job_name") == job_name]
+	return queue_by_job_name
+
+
+def is_queue_running(job_name):
+	queue = get_job_queue(job_name)
+	return queue and len(queue) > 0 and queue[0].get("status") in ["started", "queued"]
+
+def queue():
+	enqueue('urway_erpnext.api.check_payment_status', timeout=2000, queue="short", now=True, job_name="urway_erpnext")
+	
+	"""if not is_queue_running("urway_erpnext.api.check_payment_status"):
+		frappe.enqueue("urway_erpnext.api.check_payment_status",
+			queue="long",
+			timeout=2000)"""
+
+
 
 """
 Todo
 - Validate payment
+  - Check and validate, make payment
 - Add production url
 - 
 """
@@ -36,8 +59,38 @@ def make_request(method, url, auth=None, headers=None, data=None):
 def encrypt_string(hash_string):
 	return hashlib.sha256(hash_string.encode()).hexdigest()
 
+def check_payment_status():
+	todo = frappe.new_doc( 'ToDo' )
+	todo.description = "test"
+	todo.insert()
+
+	"""
+	settings = frappe.get_doc('URWay Gateway Settings' )
+	transaction = {}
+	invoice = {}
+	
+	payment_mode = settings.mode_of_payment #p_e
+	payment_name = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name #p_e
+	payment_entry = frappe.get_doc("Payment Entry", payment_name)
+	payment_entry.submit()
+	
+	transaction.status = "Success"
+	transaction.payment_entry = payment_name
+
+	transaction.flags.ignore_validate_update_after_submit = True
+	transaction.flags.ignore_validate = True
+	transaction.save()
+	"""
+	#frappe.errprint("status")
+
+
+
+
 @frappe.whitelist()
 def exe(name):
+	queue()
+
+def no():
 	
 	url = ""
 	invoice = frappe.get_doc( 'Sales Invoice', name )
@@ -48,7 +101,7 @@ def exe(name):
 
 		testing = settings.testing
 		terminal = settings.terminal_id
-		payment_mode = settings.mode_of_payment
+		payment_mode = settings.mode_of_payment #p_e
 		key = settings.merchantsecret_key
 		password = settings.password
 		customer_address = invoice.contact_display
@@ -101,6 +154,7 @@ def exe(name):
 			transaction.amount = amount
 			transaction.sales_invoice = invoice.name
 			
+			# in case of errors, show the error, these are to be specified and handled one by one, otherwise just show as is
 			if exc == "" or not exc:
 				transaction.error_message = ""
 				transaction.status = "Pending"
@@ -114,16 +168,14 @@ def exe(name):
 					error_message(response['reason'], response['responseCode'])
 
 				else:
+					# in no errors were detected: create a transaction with details for the scheduler to verify
 					url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
-					payment_name = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name
+					
 					if "URWAYPGService" not in str(invoice.terms):
 						invoice.terms = str(invoice.terms or "") + "<a href='" + url + "' style='text-decoration: underline;'>Click to Pay with URWay<a/>"
 					invoice.flags.ignore_validate_update_after_submit = True
 					invoice.flags.ignore_validate = True
-					invoice.save()					
-
-					payment_entry = frappe.get_doc("Payment Entry", payment_name)
-					payment_entry.submit()
+					invoice.save()		
 
 					transaction.insert()
 					transaction.submit()

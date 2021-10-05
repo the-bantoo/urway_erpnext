@@ -109,6 +109,11 @@ doc_events = {
 
 # Scheduled Tasks
 # ---------------
+scheduler_events = {
+	"all": [
+			"urway_erpnext.api.queue"
+	]
+}
 
 # scheduler_events = {
 # 	"all": [

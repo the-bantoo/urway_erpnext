@@ -14,13 +14,15 @@
   "testing",
   "status",
   "setup_section",
-  "mode_of_payment"
+  "mode_of_payment",
+  "column_break_11",
+  "server_ip"
  ],
  "fields": [
   {
    "fieldname": "credentials_section",
    "fieldtype": "Section Break",
-   "label": "Credentials"
+   "label": "Urway Credentials"
   },
   {
    "fieldname": "terminal_id",
@@ -78,12 +80,22 @@
    "label": "Mode of Payment",
    "options": "Mode of Payment",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_11",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Public IP of the server. The server will attempt to auto setup",
+   "fieldname": "server_ip",
+   "fieldtype": "Data",
+   "label": "Server IP"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2021-09-17 14:49:08.689339",
+ "modified": "2021-10-06 19:57:54.388581",
  "modified_by": "Administrator",
  "module": "URWay ERPNext Integration",
  "name": "URWay Gateway Settings",

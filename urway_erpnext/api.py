@@ -1,6 +1,7 @@
 import base64, json
 import datetime
 import hashlib
+import socket
 
 from pip._vendor.urllib3 import response
 import frappe
@@ -34,8 +35,9 @@ def queue():
 Todo
 - Validate payment
   - Check and validate, make payment
-- Add production url
-- 
+
+- improvements
+	- add purchase details
 """
 
 def make_request(method, url, auth=None, headers=None, data=None):
@@ -60,14 +62,23 @@ def encrypt_string(hash_string):
 	return hashlib.sha256(hash_string.encode()).hexdigest()
 
 def check_payment_status():
-	todo = frappe.new_doc( 'ToDo' )
-	todo.description = "test"
-	todo.insert()
+
+	settings = frappe.get_doc('URWay Gateway Settings')	
+	transactions = frappe.get_all( 'URWay Payment Transaction', filters={'status': "Pending"}, limit=50)
+
+	for t in transactions:
+		r = make_urway_request(t.sales_invoice, "check")
+		if r == "000":
+
 
 	"""
-	settings = frappe.get_doc('URWay Gateway Settings' )
-	transaction = {}
-	invoice = {}
+	for pending transactions 
+		check urway payment status
+		if paid
+			make payment entry
+			change urway_transaction status
+	
+	
 	
 	payment_mode = settings.mode_of_payment #p_e
 	payment_name = make_payment_entry(invoice.customer, str(invoice.name), amount, payment_mode).name #p_e
@@ -83,66 +94,103 @@ def check_payment_status():
 	"""
 	#frappe.errprint("status")
 
+def get_server_ip():
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	s.connect(('8.8.8.8', 1))
+	ip = s.getsockname()[0]
+	s.close()
 
+	frappe.db.set_value('URWay Gateway Settings', 'URWay Gateway Settings', 'server_ip', ip)
+
+	return ip
+
+def get_country(company_name):
+	company = frappe.get_cached_doc('Company', company_name)
+	return company.country
+
+def get_customer_email(customer_name):
+	customer = frappe.get_doc('Customer', customer_name)
+	if customer.email_id:
+		return customer.email_id
+	else:
+		frappe.throw("An email address is required on this customer's primary contact")
 
 
 @frappe.whitelist()
-def exe(name):
-	queue()
+def make_urway_request(invoice_name, trans_type):
 
-def no():
-	
-	url = ""
-	invoice = frappe.get_doc( 'Sales Invoice', name )
+	invoice = frappe.get_cached_doc( 'Sales Invoice', invoice_name )
+
 	if int(invoice.outstanding_amount) != 0:
-	
-		transaction = frappe.new_doc( 'URWay Payment Transaction' )
-		settings = frappe.get_doc('URWay Gateway Settings' )
 
+		transaction = {}
+		transaction_name = None
+
+		if frappe.db.exists({'doctype': 'URWay Payment Transaction', 'sales_invoice': invoice.name }):
+			transaction_name = frappe.get_list( 'URWay Payment Transaction', filters={'sales_invoice': invoice.name}, limit=1, pluck='name')
+			transaction = frappe.get_doc( 'URWay Payment Transaction', transaction_name[0] )
+		else:
+			transaction = frappe.new_doc( 'URWay Payment Transaction' )
+
+		settings = frappe.get_cached_doc( 'URWay Gateway Settings' )
+
+		url = ""
+		request_url = ""
+		response = ""
+		exc = ""
+		
 		testing = settings.testing
 		terminal = settings.terminal_id
 		payment_mode = settings.mode_of_payment #p_e
 		key = settings.merchantsecret_key
 		password = settings.password
-		customer_address = invoice.contact_display
+		customer_address = invoice.contact_display or "None"
 		amount = str(invoice.outstanding_amount)
-		action = str(1)
+		currency = invoice.currency
+		server_ip = settings.server_ip or get_server_ip() # customer_ip = "10.10.10.10" sent from js client  "customerIp": customer_ip,
+		country = get_country(invoice.company)
+		customer_email = get_customer_email(invoice.customer)
 
-		"""add to doctype"""
-		server_ip = "194.195.217.200"
-		customer_ip = "10.10.10.10"
-		country = "Saudi Arabia"
-		currency = "SAR"
-		customer_email = "customer@mail.com"
-
-		hash = encrypt_string( "|".join([invoice.name, terminal, password, key, amount, currency]) )
-		
-		request_url = ""
-		response = ""
-		exc = ""
-		
 		if str(testing) == "1":
 			request_url = "https://payments-dev.urway-tech.com/URWAYPGService/transaction/jsonProcess/JSONrequest"
 		else:
-			request_url = ""
+			request_url = "https://payments."
 
-		try:
-			response = make_request("POST", request_url, data = {
+		hash = encrypt_string( "|".join([invoice.name, terminal, password, key, amount, currency]) )
+		
+		if trans_type == "pay":
+			payload = {
 				"amount": amount,
 				"address": customer_address,
-				"city": "Arabia",
-				"customerIp": customer_ip,
+				#"city": "Arabia",
 				"customerEmail": customer_email,
 				"zipCode": "",
 				"trackid": invoice.name,
 				"terminalId": terminal,
-				"action": action,
+				"action": "1",
 				"password": password,
 				"merchantIp": server_ip,
 				"requestHash": hash,
 				"country": country,
 				"currency": currency
-			})
+			}
+		else:
+			payload = {
+				"transid": transaction.trans_id,		
+				"trackid": invoice.name,
+				"terminalId": terminal,	
+				"action": "10",
+				"merchantIp": server_ip,
+				"merchantIp": "10.10.10.101",
+				"password": password,
+				"currency": currency,
+				"amount": amount,
+				"requestHash": hash
+			}
+			frappe.errprint(str(payload))
+
+		try:
+			response = make_request("POST", request_url, data = payload)
 		except Exception as exc:
 			frappe.msgprint(str(exc), "Oops !!!")
 			transaction.error_message = str(exc)
@@ -156,39 +204,66 @@ def no():
 			
 			# in case of errors, show the error, these are to be specified and handled one by one, otherwise just show as is
 			if exc == "" or not exc:
-				transaction.error_message = ""
-				transaction.status = "Pending"
+
 				if response['responseCode']:
-					frappe.errprint("-------- error --------")
-					if response['responseCode'] == "612":
-						frappe.errprint("Invalid amount \n \n" + str(response) )
-					else:
-						frappe.errprint( str(response) )
-
-					error_message(response['reason'], response['responseCode'])
-
-				else:
-					# in no errors were detected: create a transaction with details for the scheduler to verify
-					url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
 					
-					if "URWAYPGService" not in str(invoice.terms):
-						invoice.terms = str(invoice.terms or "") + "<a href='" + url + "' style='text-decoration: underline;'>Click to Pay with URWay<a/>"
-					invoice.flags.ignore_validate_update_after_submit = True
-					invoice.flags.ignore_validate = True
-					invoice.save()		
+					# in no errors were detected: create a transaction with details for the scheduler to verify
 
-					transaction.insert()
-					transaction.submit()
+					if response['responseCode'] in ["", "000", "001"]:
+						if response['responseCode'] == ["000"]:
+							transaction.status = "Success"
+							transaction.error_message = ""
+
+						elif response['responseCode'] == ["001"]:
+							transaction.status = "Pending"
+							transaction.error_message = ""
+
+						if "URWAYPGService" not in str(invoice.terms):
+							url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
+							invoice.terms = str(invoice.terms or "") + "<br><a href='" + url + "' style='text-decoration: underline;'>Click to Pay with URWay</a>"
+							transaction.trans_id = response['payid']
+
+						invoice.flags.ignore_validate_update_after_submit = True
+						invoice.flags.ignore_validate = True
+						invoice.save()
+
+					elif response['responseCode'] == "612":
+							frappe.errprint("-------- error --------")
+							frappe.errprint("Invalid amount \n \n" + str(response))
+							transaction.status = "Failed"
+							transaction.error_message = str(response['responseCode']) +": "+ response['result']
+							show_error_message(response['result'], response['responseCode'])
+
+					else:
+						frappe.errprint("-------- error --------")
+						frappe.errprint(str(response))
+						transaction.status = "Failed"
+						transaction.error_message = str(response['responseCode']) +": "+ response['result']
+						show_error_message(response['result'], response['responseCode'])
+
+					if transaction_name:
+						transaction.flags.ignore_validate_update_after_submit = True
+						transaction.flags.ignore_validate = True
+						transaction.save(ignore_permissions=True)
+					else:
+						transaction.insert(ignore_permissions=True)
+						transaction.submit()
+
+					return response['responseCode']
 	else:
 		frappe.msgprint("This invoice is already fully paid")
 
 	return url or ""
 
-def error_message(reason, response):
-	frappe.msgprint(reason, "Error " + response)
+def show_error_message(reason, response):
+	frappe.msgprint(
+		title = reason,
+		msg = "Error code: " + response,
+    	indicator = 'red'
+	)
 
 def make_payment_entry(customer, invoice_name, amount, payment_mode):
-	company = frappe.get_doc("Company", frappe.defaults.get_user_default("Company"))
+	company = frappe.get_cached_doc("Company", frappe.defaults.get_user_default("Company"))
 	
 	payment_entry = frappe.get_doc({
 		"doctype": "Payment Entry",

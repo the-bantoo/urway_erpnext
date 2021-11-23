@@ -113,7 +113,7 @@ def get_customer_email(customer_name):
 	if customer.email_id:
 		return customer.email_id
 	else:
-		frappe.throw("An email address is required on this customer's primary contact")
+		frappe.throw(_("An email address is required on this customer's primary contact"))
 
 
 @frappe.whitelist()
@@ -251,7 +251,7 @@ def make_urway_request(invoice_name, trans_type):
 
 					return response['responseCode']
 	else:
-		frappe.msgprint("This invoice is already fully paid")
+		frappe.msgprint(_("This invoice is already fully paid"))
 
 	return url or ""
 

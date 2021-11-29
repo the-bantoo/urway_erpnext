@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import socket
 
+from frappe import _
 from pip._vendor.urllib3 import response
 import frappe
 import hashlib
@@ -27,7 +28,8 @@ def queue():
 	"""if not is_queue_running("urway_erpnext.api.check_payment_status"):
 		frappe.enqueue("urway_erpnext.api.check_payment_status",
 			queue="long",
-			timeout=2000)"""
+			timeout=2000)
+	"""
 
 
 
@@ -69,8 +71,8 @@ def check_payment_status():
 	for t in transactions:
 		r = make_urway_request(t.sales_invoice, "check")
 		if r == "000":
-
-
+			pass
+	
 	"""
 	for pending transactions 
 		check urway payment status
@@ -116,10 +118,15 @@ def get_customer_email(customer_name):
 		frappe.throw(_("An email address is required on this customer's primary contact"))
 
 
-@frappe.whitelist()
-def make_urway_request(invoice_name, trans_type):
 
-	invoice = frappe.get_cached_doc( 'Sales Invoice', invoice_name )
+@frappe.whitelist()
+def make_urway_request(invoice, trans_type="pay", method=None):
+
+	# get the whole invoice if parameter is only the invoice name
+	invoice = invoice
+	
+	if "doctype" not in invoice:
+		invoice = frappe.get_doc( 'Sales Invoice', invoice )
 
 	if int(invoice.outstanding_amount) != 0:
 
@@ -128,7 +135,7 @@ def make_urway_request(invoice_name, trans_type):
 
 		if frappe.db.exists({'doctype': 'URWay Payment Transaction', 'sales_invoice': invoice.name }):
 			transaction_name = frappe.get_list( 'URWay Payment Transaction', filters={'sales_invoice': invoice.name}, limit=1, pluck='name')
-			transaction = frappe.get_doc( 'URWay Payment Transaction', transaction_name[0] )
+			transaction = frappe.get_doc( 'URWay Payment Transaction', transaction_name[0] ) # use get_doc with filter
 		else:
 			transaction = frappe.new_doc( 'URWay Payment Transaction' )
 
@@ -153,11 +160,29 @@ def make_urway_request(invoice_name, trans_type):
 
 		if str(testing) == "1":
 			request_url = "https://payments-dev.urway-tech.com/URWAYPGService/transaction/jsonProcess/JSONrequest"
+			frappe.errprint("testing")
 		else:
-			request_url = "https://payments."
+			request_url = "https://payments.urway-tech.com/URWAYPGService/transaction/jsonProcess/JSONrequest"
 
 		hash = encrypt_string( "|".join([invoice.name, terminal, password, key, amount, currency]) )
 		
+		from urllib.parse import urlencode
+
+		# Creating public url to print format
+		default_print_format = frappe.db.get_value('Property Setter', dict(property='default_print_format', doc_type=invoice.doctype), "value")
+
+		# System Language
+		language = frappe.get_system_settings('language')
+
+		params = urlencode({
+			'format': "Paid Invoice" or 'Standard',
+			'_lang': language,
+			'key': invoice.get_signature()
+		})
+
+		# creating qr code for the url
+		doc_url = f"{ frappe.utils.get_url() }/{ 'Sales%20Invoice' }/{ invoice.name }?{ params }"
+
 		if trans_type == "pay":
 			payload = {
 				"amount": amount,
@@ -172,6 +197,7 @@ def make_urway_request(invoice_name, trans_type):
 				"merchantIp": server_ip,
 				"requestHash": hash,
 				"country": country,
+				"udf2": doc_url,
 				"currency": currency
 			}
 		else:
@@ -185,9 +211,10 @@ def make_urway_request(invoice_name, trans_type):
 				"password": password,
 				"currency": currency,
 				"amount": amount,
-				"requestHash": hash
+				"requestHash": hash,
+				"udf2": doc_url,
 			}
-			frappe.errprint(str(payload))
+		frappe.errprint(str(payload))
 
 		try:
 			response = make_request("POST", request_url, data = payload)
@@ -205,11 +232,12 @@ def make_urway_request(invoice_name, trans_type):
 			# in case of errors, show the error, these are to be specified and handled one by one, otherwise just show as is
 			if exc == "" or not exc:
 
-				if response['responseCode']:
-					
+				if 'responseCode' in response:
+				
 					# in no errors were detected: create a transaction with details for the scheduler to verify
+					if response['responseCode'] in [None, "", "000", "001"]:
 
-					if response['responseCode'] in ["", "000", "001"]:
+						frappe.errprint(response['responseCode'])
 						if response['responseCode'] == ["000"]:
 							transaction.status = "Success"
 							transaction.error_message = ""
@@ -218,9 +246,9 @@ def make_urway_request(invoice_name, trans_type):
 							transaction.status = "Pending"
 							transaction.error_message = ""
 
-						if "URWAYPGService" not in str(invoice.terms):
-							url = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
-							invoice.terms = str(invoice.terms or "") + "<br><a href='" + url + "' style='text-decoration: underline;'>Click to Pay with URWay</a>"
+						if invoice.urway == "" or invoice.urway == None:
+							href = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
+							invoice.urway = "<a href='" + href + "' style='text-decoration: underline;'>Click to Pay with URWay</a>"
 							transaction.trans_id = response['payid']
 
 						invoice.flags.ignore_validate_update_after_submit = True
@@ -229,7 +257,7 @@ def make_urway_request(invoice_name, trans_type):
 
 					elif response['responseCode'] == "612":
 							frappe.errprint("-------- error --------")
-							frappe.errprint("Invalid amount \n \n" + str(response))
+							frappe.errprint(_("Invalid amount \n \n" + str(response)))
 							transaction.status = "Failed"
 							transaction.error_message = str(response['responseCode']) +": "+ response['result']
 							show_error_message(response['result'], response['responseCode'])
@@ -250,6 +278,9 @@ def make_urway_request(invoice_name, trans_type):
 						transaction.submit()
 
 					return response['responseCode']
+				else:
+					frappe.errprint(str(response))
+					
 	else:
 		frappe.msgprint(_("This invoice is already fully paid"))
 
@@ -259,7 +290,7 @@ def show_error_message(reason, response):
 	frappe.msgprint(
 		title = reason,
 		msg = "Error code: " + response,
-    	indicator = 'red'
+		indicator = 'red'
 	)
 
 def make_payment_entry(customer, invoice_name, amount, payment_mode):

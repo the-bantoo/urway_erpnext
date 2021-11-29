@@ -15,8 +15,11 @@ app_license = "MIT"
 # Hook on document methods and events
 doc_events = {
     "URWay Payment Transaction": {
-        #"before_save": "urway_erpnext.api.exe",
-    }
+        #"before_save": "urway_erpnext.api.check_status",
+    },
+	"Sales Invoice": {
+		"on_submit": "urway_erpnext.api.",
+	}
 }
 
 # Includes in <head>
@@ -188,3 +191,12 @@ user_data_fields = [
 # 	"urway_erpnext.auth.validate"
 # ]
 
+fixtures = [
+	{"dt": "Custom Field", "filters": [
+		[
+			"name", "in", [
+				"POS Invoice-urway"
+			]
+		]
+	]}
+]

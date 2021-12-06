@@ -120,12 +120,14 @@ def get_customer_email(customer_name):
 
 
 @frappe.whitelist()
-def make_urway_request(invoice, trans_type="pay", method=None):
+def make_urway_request(invoice, method=None, trans_type="pay"):
 
 	# get the whole invoice if parameter is only the invoice name
 	invoice = invoice
+
+	frappe.errprint(trans_type)
 	
-	if "doctype" not in invoice:
+	if type(invoice) == "<class 'str'>":
 		invoice = frappe.get_doc( 'Sales Invoice', invoice )
 
 	if int(invoice.outstanding_amount) != 0:
@@ -207,7 +209,6 @@ def make_urway_request(invoice, trans_type="pay", method=None):
 				"terminalId": terminal,	
 				"action": "10",
 				"merchantIp": server_ip,
-				"merchantIp": "10.10.10.101",
 				"password": password,
 				"currency": currency,
 				"amount": amount,
@@ -248,12 +249,11 @@ def make_urway_request(invoice, trans_type="pay", method=None):
 
 						if invoice.urway == "" or invoice.urway == None:
 							href = ( response['targetUrl'] + "?paymentid=" + response['payid'] )
-							invoice.urway = "<a href='" + href + "' style='text-decoration: underline;'>Click to Pay with URWay</a>"
+							invoice.db_set('urway', "<a href='" + href + "' target='_blank' style='text-decoration: underline;'><b>Click to Pay with URWay</b></a>")
 							transaction.trans_id = response['payid']
 
 						invoice.flags.ignore_validate_update_after_submit = True
 						invoice.flags.ignore_validate = True
-						invoice.save()
 
 					elif response['responseCode'] == "612":
 							frappe.errprint("-------- error --------")
@@ -280,6 +280,9 @@ def make_urway_request(invoice, trans_type="pay", method=None):
 					return response['responseCode']
 				else:
 					frappe.errprint(str(response))
+
+				frappe.db.commit()
+				invoice.notify_update()
 					
 	else:
 		frappe.msgprint(_("This invoice is already fully paid"))

@@ -18,7 +18,7 @@ doc_events = {
         #"before_save": "urway_erpnext.api.check_status",
     },
 	"Sales Invoice": {
-		"on_submit": "urway_erpnext.api.",
+		"on_submit": "urway_erpnext.api.make_urway_request",
 	}
 }
 
@@ -195,7 +195,14 @@ fixtures = [
 	{"dt": "Custom Field", "filters": [
 		[
 			"name", "in", [
-				"POS Invoice-urway"
+				"Sales Invoice-urway"
+			]
+		]
+	]},
+	{"dt": "Print Format", "filters": [
+		[
+			"name", "in", [
+				"Paid Invoice"
 			]
 		]
 	]}

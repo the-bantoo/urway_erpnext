@@ -279,7 +279,7 @@ def make_urway_request(invoice, method=None, trans_type="pay"):
 
 					return response['responseCode']
 				else:
-					frappe.errprint(str(response))
+					frappe.throw(str(response))
 
 				frappe.db.commit()
 				invoice.notify_update()
@@ -290,7 +290,7 @@ def make_urway_request(invoice, method=None, trans_type="pay"):
 	return url or ""
 
 def show_error_message(reason, response):
-	frappe.msgprint(
+	frappe.throw(
 		title = reason,
 		msg = "Error code: " + response,
 		indicator = 'red'

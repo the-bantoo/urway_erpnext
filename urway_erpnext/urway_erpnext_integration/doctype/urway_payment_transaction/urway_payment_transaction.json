@@ -74,7 +74,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Not Started\nPending\nFailed\nSuccess"
+   "options": "Not Started\nPending\nFailed\nLink Generated\nPaid"
   },
   {
    "fieldname": "column_break_10",
@@ -111,7 +111,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2021-10-07 10:58:17.917506",
+ "modified": "2021-12-10 16:58:01.505794",
  "modified_by": "Administrator",
  "module": "URWay ERPNext Integration",
  "name": "URWay Payment Transaction",

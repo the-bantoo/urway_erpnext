@@ -15,10 +15,11 @@ app_license = "MIT"
 # Hook on document methods and events
 doc_events = {
     "URWay Payment Transaction": {
-        #"before_save": "urway_erpnext.api.check_status",
+        #"on_update": "urway_erpnext.api.get_payment_status",
     },
 	"Sales Invoice": {
-		"on_submit": "urway_erpnext.api.make_urway_request",
+		"on_submit": "urway_erpnext.api.set_urway_link",
+		#"on_submit": "urway_erpnext.api.make_urway_request",
 	}
 }
 

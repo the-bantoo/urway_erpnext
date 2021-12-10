@@ -108,7 +108,6 @@ def show_payment_status(invoice):
 
 	invoice = frappe.get_cached_doc("Sales Invoice", invoice)
 	get_payment_status(invoice)
-	frappe.errprint("11")
 
 	from urllib.parse import urlencode
 
@@ -132,14 +131,13 @@ def show_payment_status(invoice):
 # check the status of the payment from urway
 @frappe.whitelist(allow_guest=True)
 def get_payment_status(invoice):
-	frappe.errprint("07")
+	
 	# check payment status of invoice
 	if invoice.status != "Paid" and invoice.docstatus == 1:
 		payment_status = make_urway_request(invoice, method=None, trans_type="check")
 
 		if get_urway_payment_transaction(invoice.name).status == "Paid":
 			make_payment_entry(invoice)
-			frappe.errprint("09")
 
 
 def get_urway_payment_transaction(invoice_name):
@@ -176,7 +174,6 @@ def make_payment_entry(invoice):
 			}
 		]
 	})
-	frappe.errprint("12")
 
 	payment_name = payment_entry.insert()
 
@@ -189,14 +186,23 @@ def make_payment_entry(invoice):
 def set_urway_link(invoice, method=None):
 	href = frappe.utils.get_url() + "/api/method/urway_erpnext.api.make_urway_payment_link/?invoice=" + invoice.name
 
-	invoice.db_set('urway', "<a href='" + href + "' target='_blank' style='text-decoration: underline;'> \
+	invoice.db_set('urway', 
+			"<a href='" + href + "' target='_blank' style='text-decoration: underline;'> \
 			<b>Click to Pay with URWay | اضغط هنا لدفع الفاتورة إلكترونيا</b> \
 			</a>")
 	frappe.db.commit()
 
 @frappe.whitelist(allow_guest=True)
 def make_urway_payment_link(invoice):
+
 	invoice = frappe.get_cached_doc("Sales Invoice", invoice)
+	frappe.errprint(invoice.status)
+
+	# check if invoice is already paid
+	if invoice.status == "Paid":
+		show_payment_status(invoice.name)
+		return
+
 	payment_link = make_urway_request(invoice, method=None, trans_type="pay")
 	frappe.local.response['type'] = "redirect"
 	frappe.local.response['location'] = payment_link
@@ -364,8 +370,6 @@ def make_urway_request(invoice, method=None, trans_type="pay"):
 
 				else:
 					frappe.throw(str(response))
-	else:
-		frappe.throw(_("This invoice is already fully paid"))
 
 def show_error_message(reason, response):
 	frappe.throw(

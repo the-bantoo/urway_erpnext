@@ -12,26 +12,6 @@ from frappe.utils import today
 from frappe.utils.background_jobs import enqueue
 from frappe.core.page.background_jobs.background_jobs import get_info
 
-def get_job_queue(job_name):
-	queue_info = get_info()
-	queue_by_job_name = [queue for queue in queue_info if queue.get("job_name") == job_name]
-	return queue_by_job_name
-
-
-def is_queue_running(job_name):
-	queue = get_job_queue(job_name)
-	return queue and len(queue) > 0 and queue[0].get("status") in ["started", "queued"]
-
-def queue():
-	enqueue('urway_erpnext.api.check_payment_status', timeout=2000, queue="short", now=True, job_name="urway_erpnext")
-	
-	"""if not is_queue_running("urway_erpnext.api.check_payment_status"):
-		frappe.enqueue("urway_erpnext.api.check_payment_status",
-			queue="long",
-			timeout=2000)
-	"""
-
-
 
 """
 Todo
@@ -188,6 +168,7 @@ def set_urway_link(invoice, method=None):
 
 	invoice.db_set('urway', 
 			"<a href='" + href + "' target='_blank' style='text-decoration: underline;'> \
+			<br/><img src='/assets/urway_erpnext/images/visa-mastercard-mada-logo.png' style='max-width: 75% !important;'><br/> \
 			<b>Click to Pay with URWay | اضغط هنا لدفع الفاتورة إلكترونيا</b> \
 			</a>")
 	frappe.db.commit()
@@ -239,7 +220,7 @@ def make_urway_request(invoice, method=None, trans_type="pay"):
 		customer_address = invoice.contact_display or "None"
 		amount = str(invoice.outstanding_amount)
 		currency = invoice.currency
-		server_ip = settings.server_ip or get_server_ip() # customer_ip = "10.10.10.10" sent from js client  "customerIp": customer_ip,
+		server_ip = settings.server_ip or get_server_ip()
 		country = get_country(invoice.company)
 		customer_email = get_customer_email(invoice.customer)
 

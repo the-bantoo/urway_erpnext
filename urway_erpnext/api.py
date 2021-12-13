@@ -192,7 +192,10 @@ def make_urway_payment_link(invoice):
 
 @frappe.whitelist(allow_guest=True)
 def pay(invoice):
-
+	
+	frappe.set_user("Administrator")
+	frappe.local.no_cache = True
+	
 	invoice = frappe.get_doc("Sales Invoice", invoice)
 
 	# check if invoice is already paid

@@ -54,7 +54,7 @@ def get_server_ip():
 	return ip
 
 def get_country(company_name):
-	company = frappe.get_cached_doc('Company', company_name)
+	company = frappe.get_doc('Company', company_name)
 	return company.country
 
 def get_customer_email(customer_name):
@@ -94,7 +94,7 @@ def show_payment_status(invoice):
 @frappe.whitelist(allow_guest=True)
 def status(invoice):
 
-	invoice = frappe.get_cached_doc("Sales Invoice", invoice)
+	invoice = frappe.get_doc("Sales Invoice", invoice)
 	get_payment_status(invoice)
 
 	from urllib.parse import urlencode
@@ -128,8 +128,8 @@ def get_payment_status(invoice):
 			make_payment_entry(invoice)
 
 def make_payment_entry(invoice):
-	company = frappe.get_cached_doc("Company", frappe.defaults.get_user_default("Company"))
-	trans = frappe.get_cached_doc( 'URWay Gateway Settings' )
+	company = frappe.get_doc("Company", frappe.defaults.get_user_default("Company"))
+	trans = frappe.get_doc( 'URWay Gateway Settings' )
 
 	#paid_from, paid_from_account_currency, base_paid_amount
 	logged_in_user = frappe.session.user
@@ -193,7 +193,7 @@ def make_urway_payment_link(invoice):
 @frappe.whitelist(allow_guest=True)
 def pay(invoice):
 
-	invoice = frappe.get_cached_doc("Sales Invoice", invoice)
+	invoice = frappe.get_doc("Sales Invoice", invoice)
 
 	# check if invoice is already paid
 	if invoice.status == "Paid":
@@ -239,7 +239,7 @@ def get_payment_link(invoice):
 		transaction = get_or_make_urway_transaction(invoice)
 		transaction_name = transaction.name
 
-		settings = frappe.get_cached_doc( 'URWay Gateway Settings' )
+		settings = frappe.get_doc( 'URWay Gateway Settings' )
 		
 		testing_mode = settings.testing
 		terminal = settings.terminal_id
@@ -369,7 +369,7 @@ def fetch_payment_status(invoice):
 	transaction = get_or_make_urway_transaction(invoice)
 	transaction_name = transaction.name
 
-	settings = frappe.get_cached_doc( 'URWay Gateway Settings' )
+	settings = frappe.get_doc( 'URWay Gateway Settings' )
 	
 	testing_mode = settings.testing
 	terminal = settings.terminal_id

@@ -14,14 +14,16 @@ app_license = "MIT"
 # ---------------
 # Hook on document methods and events
 doc_events = {
-    "URWay Payment Transaction": {
-        #"on_update": "urway_erpnext.api.get_payment_status",
-    },
 	"Sales Invoice": {
 		"on_submit": "urway_erpnext.api.set_urway_link",
-		#"on_submit": "urway_erpnext.api.make_urway_request",
 	}
 }
+
+"""
+"URWay Payment Transaction": {
+		#"on_update": "urway_erpnext.api.get_payment_status",
+	},
+"""
 
 # Includes in <head>
 # ------------------
@@ -197,6 +199,7 @@ fixtures = [
 		[
 			"name", "in", [
 				"Sales Invoice-urway"
+				"Sales Invoice-urway_sms_link"
 			]
 		]
 	]},

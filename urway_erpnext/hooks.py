@@ -198,7 +198,7 @@ fixtures = [
 	{"dt": "Custom Field", "filters": [
 		[
 			"name", "in", [
-				"Sales Invoice-urway"
+				"Sales Invoice-urway",
 				"Sales Invoice-urway_sms_link"
 			]
 		]
